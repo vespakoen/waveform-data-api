@@ -1,0 +1,25 @@
+name: audiowaveform
+
+on:
+  push:
+    paths:
+      - 'audiowaveform-bin/**'
+
+jobs:
+  build:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Dependencies
+      run: |
+        sudo apt-get install git make cmake gcc g++ libmad0-dev \
+        libid3tag0-dev libsndfile1-dev libgd-dev libboost-filesystem-dev \
+        libboost-program-options-dev \
+        libboost-regex-dev
+    - name: Build
+      run: mkdir build && cd build && cmake -D BUILD_STATIC=1 -D ENABLE_TESTS=0 -D CMAKE_BUILD_TYPE=Release .. && make && ls
+      working-directory: ./audiowaveform-bin/src

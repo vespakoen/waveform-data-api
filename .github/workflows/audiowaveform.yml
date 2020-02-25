@@ -21,8 +21,8 @@ jobs:
         git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
     - name: Dependencies
       run: |
-        sudo apt-get install git make cmake gcc g++ libmad0-dev \
+        sudo apt-get install make libmad0-dev \
         libid3tag0-dev libsndfile1-dev libgd-dev
     - name: Build
-      run: mkdir build && cd build && cmake -D BUILD_STATIC=1 -D ENABLE_TESTS=0 -D CMAKE_BUILD_TYPE=Release .. && make && ls
+      run: mkdir build && cd build && cmake -D BUILD_STATIC=1 -D ENABLE_TESTS=0 -D CMAKE_BUILD_TYPE=Release  -D CMAKE_C_COMPILER=/usr/local/bin/clang -D CMAKE_CXX_COMPILER=/usr/local/bin/clang++ .. && make && ls
       working-directory: ./audiowaveform-bin/src

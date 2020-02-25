@@ -22,7 +22,7 @@ jobs:
     - name: Dependencies
       run: |
         sudo apt-get install git make cmake gcc g++ libmad0-dev \
-        libid3tag0-dev libsndfile1-dev libgd-dev libboost-dev
+        libid3tag0-dev libsndfile1-dev libgd-dev
     - name: Build
       run: mkdir build && cd build && cmake -D BUILD_STATIC=1 -D ENABLE_TESTS=0 -D CMAKE_BUILD_TYPE=Release .. && make && ls
       working-directory: ./audiowaveform-bin/src

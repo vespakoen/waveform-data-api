@@ -1,9 +1,9 @@
 name: audiowaveform
 
-on:
-  push:
-    paths:
-      - 'audiowaveform-bin/**'
+# on:
+#   push:
+#     paths:
+#       - 'audiowaveform-bin/**'
 
 jobs:
   build:
@@ -12,6 +12,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+    - name: Checkout submodules
+      shell: bash
       run: |
         auth_header="$(git config --local --get http.https://github.com/.extraheader)"
         git submodule sync --recursive

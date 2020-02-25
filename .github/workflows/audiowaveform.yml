@@ -26,5 +26,5 @@ jobs:
         libboost-program-options-dev \
         libboost-regex-dev
     - name: Build
-      run: mkdir build && cd build && cmake -D BUILD_STATIC=1 -D ENABLE_TESTS=0 -D CMAKE_BUILD_TYPE=Release .. && make && ls
+      run: mkdir build && cd build && cmake -D BUILD_STATIC=1 -D ENABLE_TESTS=0 -D CMAKE_BUILD_TYPE=Release .. && make VERBOSE=1 && ls
       working-directory: ./audiowaveform-bin/src

@@ -12,9 +12,10 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-        submodules: true
+      run: |
+        auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+        git submodule sync --recursive
+        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
     - name: Dependencies
       run: |
         sudo apt-get install git make cmake gcc g++ libmad0-dev \

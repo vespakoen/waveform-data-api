@@ -9,7 +9,7 @@ on: [push]
 jobs:
   build:
     timeout-minutes: 15
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-16.04
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -25,11 +25,11 @@ jobs:
       run: |
         sudo apt-get install git make cmake libmad0-dev \
         libid3tag0-dev libsndfile1-dev libgd-dev libboost-filesystem-dev \
-        libboost-filesystem1.65.1 \
+        libboost-filesystem \
         libboost-program-options-dev \
-        libboost-program-options1.65.1 \
+        libboost-program-options \
         libboost-regex-dev \
-        libboost-regex1.65.1
+        libboost-regex
     - name: Build
       run: mkdir build && cd build && cmake -D BUILD_STATIC=1 -D ENABLE_TESTS=0 -D CMAKE_BUILD_TYPE=Release .. && make VERBOSE=1 && ls
       working-directory: ./audiowaveform-bin/src

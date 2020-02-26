@@ -1,3 +1,0 @@
-[submodule "audiowaveform-bin/src"]
-	path = audiowaveform-bin/src
-	url = https://github.com/bbc/audiowaveform.git

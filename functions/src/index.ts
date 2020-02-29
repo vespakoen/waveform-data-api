@@ -1,34 +1,35 @@
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions'
 import fetch from 'node-fetch'
-import ffmpegWaveform from './ffmpeg-waveform'
 import { spawn } from 'child_process'
 import sha1 from 'sha1'
 import admin from 'firebase-admin'
 import fs from 'fs'
-const downsampler = require("downsample-lttb")
+// const downsampler = require("downsample-lttb")
 
-admin.initializeApp(functions.config().firebase);
+admin.initializeApp(functions.config().firebase)
 
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
 const ffprobePath = require('@ffprobe-installer/ffprobe').path
 
-function downsample(numbers: number[], targetLength: number) {
-    const pairs = numbers.map((number, i) => [i, number])
-    return downsampler.processData(pairs, targetLength)
-        .map((pair: [number, number]) => pair[1])
-}
+// function downsample(numbers: number[], targetLength: number) {
+//     const pairs = numbers.map((number, i) => [i, number])
+//     return downsampler.processData(pairs, targetLength)
+//         .map((pair: [number, number]) => pair[1])
+// }
 
 function probeJson(file: string) {
     return new Promise((resolve, reject) => {
         const ffprobe = spawn(ffprobePath, ['-i', file, '-v', 'quiet', '-select_streams', 'a:0', '-print_format', 'json', '-show_format', '-show_streams', '-hide_banner'])
-        const probeBufs: Buffer[] = []
-        ffprobe.stdout.on('data', (data) => probeBufs.push(data))
+        const bufs: Buffer[] = []
+        const errBufs: Buffer[] = []
+        ffprobe.stdout.on('data', (data) => bufs.push(data))
+        ffprobe.stderr.on('data', (data) => errBufs.push(data))
         ffprobe.on('close', (code) => {
             if (code !== 0) {
-                reject(`ffprobe exited with code: ${code}`)
+                reject(new Error(`ffprobe exited with code: ${code}, stderr: ${Buffer.concat(errBufs).toString()}`))
                 return
             }
-            const ffprobeData = JSON.parse(Buffer.concat(probeBufs).toString())
+            const ffprobeData = JSON.parse(Buffer.concat(bufs).toString())
             resolve(ffprobeData)
         })
     })
@@ -38,16 +39,39 @@ function ffmpegBuffer(file: string, sampleRate: number): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const ffmpeg = spawn(ffmpegPath, ['-i', file, '-ac', '1', '-filter:a', 'aresample=' + sampleRate, '-map', '0:a', '-c:a', 'pcm_s16le', '-f', 'data', '-']);
         const bufs: Buffer[] = []
+        const errBufs: Buffer[] = []
         ffmpeg.stdout.on('data', (data) => bufs.push(data))
+        ffmpeg.stderr.on('data', (data) => errBufs.push(data))
         ffmpeg.on('close', (code) => {
             if (code !== 0) {
-                reject(`ffmpeg exited with code: ${code}`)
+                reject(new Error(`ffmpeg exited with code: ${code}, stderr: ${Buffer.concat(errBufs).toString()}`))
                 return
             }
             resolve(Buffer.concat(bufs))
         })
     })
 }
+
+function bufferToPeaks(buffer: Buffer, length: number) {
+    const waves = []
+    let totalMax = -Infinity
+    const steps = Math.floor(buffer.length / length) || 1
+    for (var i = 0; i < buffer.length - steps; i += steps) {
+        let max = 0
+        for (var j = 0; j < steps; j += 1) {
+            const value = Math.abs(buffer.readInt16LE(i + j))
+            if (value > max) {
+                max = value
+            }
+        }
+        waves.push(max)
+        if (max > totalMax) {
+            totalMax = max
+        }
+    }
+    return waves.map(wave => Math.round((wave / totalMax) * 10000) / 10000)
+  }
+  
 
 function urlToWaveform(url: string, samples: number): Promise<{ peaks: number[], info: any }> {
     return fetch(url)
@@ -59,22 +83,32 @@ function urlToWaveform(url: string, samples: number): Promise<{ peaks: number[],
                 res.body.pipe(writeStream)
                 writeStream.on('error', reject)
                 writeStream.on('close', async () => {
-                    const ffprobeData: any = await probeJson(tmpFile)
-                    let sampleRate = 1000
-                    if (ffprobeData.format.duration < 1) {
-                        sampleRate = sampleRate / ffprobeData.format.duration
+                    try {
+                        const ffprobeData: any = await probeJson(tmpFile)
+                        const sampleRate = Math.round(Math.max(samples / ffprobeData.format.duration, 800))
+                        const ffmpegData = await ffmpegBuffer(tmpFile, sampleRate)
+                        fs.unlinkSync(tmpFile)
+                        const peaks = bufferToPeaks(ffmpegData, samples)
+                        resolve({
+                            info: ffprobeData,
+                            peaks
+                        })
+                    } catch (err) {
+                        reject(err.message)
                     }
-                    const ffmpegData = await ffmpegBuffer(tmpFile, sampleRate)
-                    fs.unlinkSync(tmpFile)
-                    const peaks = ffmpegWaveform(ffmpegData)
-                    resolve({
-                        info: ffprobeData,
-                        peaks: downsample(peaks, samples)
-                    })
                 })
             })
         })
 }
+
+// function test() {
+//     // urlToWaveform('https://firebasestorage.googleapis.com/v0/b/sound-stable.appspot.com/o/sounds%2F0038f518b722d78e4dbe533758415c430c95f0cd.wav?alt=media&token=88222d3c-42b2-4af3-b35a-5768a2773ccf', 5000).then((data: any) => {
+//     urlToWaveform('https://firebasestorage.googleapis.com/v0/b/sound-stable.appspot.com/o/sounds%2F0028c5b3cb91cfe3f1c60a79569da7cd822bd2b1.wav?alt=media&token=9aff1c1e-f041-41f5-afb8-7cda8e4b426d', 2000).then((data: any) => {
+//         console.log(JSON.stringify(data.peaks))
+//     }).catch(err => console.error(err))
+// }
+
+// test()
 
 export const waveformData = functions.https.onRequest((request, response) => {
     // console.log(request.body)
@@ -121,4 +155,4 @@ export const waveformData = functions.https.onRequest((request, response) => {
         response.status(400)
         response.send(err.message)        
     })
-});
+})

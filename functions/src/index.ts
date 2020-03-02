@@ -58,7 +58,7 @@ function bufferToPeaks(buffer: Buffer, length: number) {
     const steps = Math.floor(buffer.length / length) || 1
     for (var i = 0; i < buffer.length - steps; i += steps) {
         let max = 0
-        for (var j = 0; j < steps; j += 1) {
+        for (var j = 0; j < steps; j++) {
             const value = Math.abs(buffer.readInt16LE(i + j))
             if (value > max) {
                 max = value
@@ -94,7 +94,7 @@ function urlToWaveform(url: string, samples: number): Promise<{ peaks: number[],
                             peaks
                         })
                     } catch (err) {
-                        reject(err.message)
+                        reject(err)
                     }
                 })
             })

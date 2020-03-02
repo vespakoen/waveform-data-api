@@ -52,13 +52,13 @@ function ffmpegBuffer(file: string, sampleRate: number): Promise<Buffer> {
     })
 }
 
-function bufferToPeaks(buffer: Buffer, length: number) {
+function bufferToPeaks(buffer: Buffer, length: number, samplesPerSample: number) {
     const waves = []
     let totalMax = -Infinity
     const steps = Math.floor(buffer.length / length) || 1
     for (var i = 0; i < buffer.length - steps; i += steps) {
         let max = 0
-        for (var j = 0; j < Math.min(steps, 5); j++) {
+        for (var j = 0; j < Math.min(steps, samplesPerSample); j++) {
             const value = Math.abs(buffer.readInt16LE(i + j))
             if (value > max) {
                 max = value
@@ -73,7 +73,7 @@ function bufferToPeaks(buffer: Buffer, length: number) {
   }
   
 
-function urlToWaveform(url: string, samples: number): Promise<{ peaks: number[], info: any }> {
+function urlToWaveform(url: string, samples: number, samplesPerSample: number): Promise<{ peaks: number[], info: any }> {
     return fetch(url)
         .then(res => {
             return new Promise((resolve, reject) => {
@@ -88,7 +88,7 @@ function urlToWaveform(url: string, samples: number): Promise<{ peaks: number[],
                         const sampleRate = Math.round(Math.max(samples / ffprobeData.format.duration, 800))
                         const ffmpegData = await ffmpegBuffer(tmpFile, sampleRate)
                         fs.unlinkSync(tmpFile)
-                        const peaks = bufferToPeaks(ffmpegData, samples)
+                        const peaks = bufferToPeaks(ffmpegData, samples, samplesPerSample)
                         resolve({
                             info: ffprobeData,
                             peaks
@@ -121,6 +121,7 @@ export const waveformData = functions.https.onRequest((request, response) => {
     const urls: string[] = request.body.urls
     const samples: number = request.body.samples
     const fields: string[] = request.body.fields
+    const samplesPerSample: number = request.body.samplesPerSample || 5
     const promises: Promise<any>[] = urls.map(url => {
         const hash = sha1(url + ',' + samples)
         const ref = admin.database().ref(`peaks/${hash}`)
@@ -134,7 +135,7 @@ export const waveformData = functions.https.onRequest((request, response) => {
                     })
                     return result
                 } else {
-                    return urlToWaveform(url, samples).then((data: any) => {
+                    return urlToWaveform(url, samples, samplesPerSample).then((data: any) => {
                         const save: any = {}
                         Object.keys(data).forEach(key => {
                             save[key] = JSON.stringify(data[key])
